@@ -1,7 +1,9 @@
 package co.empresa.proyecto_desarrollo3.controller;
 
 import co.empresa.proyecto_desarrollo3.dto.request.CreateEventRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
+import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.service.EventService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -9,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,33 +26,59 @@ public class EventController {
         this.eventService = eventService;
     }
 
-    // ── Endpoints públicos (sin autenticación) ───────────────────────
+    // ── US-03: Búsqueda con filtros (público) ────────────────────────
+
+    /**
+     * GET /api/v1/events/search
+     *
+     * Búsqueda paginada con filtros opcionales.
+     * Todos los parámetros son opcionales — sin filtros retorna
+     * todos los eventos publicados próximos.
+     *
+     * Ejemplos:
+     *   GET /api/v1/events/search
+     *   GET /api/v1/events/search?keyword=rock
+     *   GET /api/v1/events/search?location=bogota
+     *   GET /api/v1/events/search?dateFrom=2025-06-01&dateTo=2025-06-30
+     *   GET /api/v1/events/search?keyword=jazz&location=cali&page=0&size=10
+     */
+    @GetMapping("/search")
+    public ResponseEntity<PagedResponse<EventResponse>> searchEvents(
+            @ModelAttribute EventSearchRequest request) {
+        return ResponseEntity.ok(eventService.searchEvents(request));
+    }
+
+    // ── US-01: Catálogo simple (público) ─────────────────────────────
 
     /**
      * GET /api/v1/events
-     * Catálogo público de eventos disponibles.
+     * Listado simple sin filtros ni paginación.
+     * Mantenido por compatibilidad con US-01.
      */
     @GetMapping
     public ResponseEntity<List<EventResponse>> getPublishedEvents() {
         return ResponseEntity.ok(eventService.getPublishedEvents());
     }
 
+    // ── US-03: Detalle de evento (público) ───────────────────────────
+
     /**
      * GET /api/v1/events/{id}
-     * Detalle de un evento específico.
+     *
+     * Retorna el detalle completo de un evento:
+     * - Información general (nombre, fecha, lugar, imagen)
+     * - Tipos de boleta activos con precio y cupos restantes
+     *
+     * Solo eventos en estado PUBLISHED son visibles.
+     * Retorna 404 si el evento no existe o no está publicado.
      */
     @GetMapping("/{id}")
     public ResponseEntity<EventResponse> getEventById(@PathVariable Long id) {
         return ResponseEntity.ok(eventService.getPublishedEventById(id));
     }
 
-    // ── Endpoints del organizador (ROLE_EVENT_CREATOR) ───────────────
+    // ── US-01: Crear evento (organizador) ────────────────────────────
 
-    /**
-     * POST /api/v1/events
-     * Crea y publica un evento.
-     * El organizerKeycloakId se extrae del JWT — nunca del body.
-     */
     @PostMapping
     @PreAuthorize("hasRole('EVENT_CREATOR')")
     public ResponseEntity<EventResponse> createEvent(
@@ -57,35 +86,25 @@ public class EventController {
             @AuthenticationPrincipal Jwt jwt) {
 
         String organizerKeycloakId = jwt.getSubject();
-        EventResponse response = eventService.createAndPublish(request, organizerKeycloakId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(eventService.createAndPublish(request, organizerKeycloakId));
     }
 
-    /**
-     * GET /api/v1/events/my-events
-     * Lista todos los eventos del organizador autenticado.
-     */
     @GetMapping("/my-events")
     @PreAuthorize("hasRole('EVENT_CREATOR')")
     public ResponseEntity<List<EventResponse>> getMyEvents(
             @AuthenticationPrincipal Jwt jwt) {
 
-        String organizerKeycloakId = jwt.getSubject();
-        return ResponseEntity.ok(eventService.getMyEvents(organizerKeycloakId));
+        return ResponseEntity.ok(eventService.getMyEvents(jwt.getSubject()));
     }
 
-    /**
-     * PATCH /api/v1/events/{id}/cancel
-     * Cancela un evento del organizador. Expande la lógica en US-08.
-     */
     @PatchMapping("/{id}/cancel")
     @PreAuthorize("hasRole('EVENT_CREATOR')")
     public ResponseEntity<EventResponse> cancelEvent(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
 
-        String organizerKeycloakId = jwt.getSubject();
-        return ResponseEntity.ok(eventService.cancelEvent(id, organizerKeycloakId));
+        return ResponseEntity.ok(eventService.cancelEvent(id, jwt.getSubject()));
     }
 }
-

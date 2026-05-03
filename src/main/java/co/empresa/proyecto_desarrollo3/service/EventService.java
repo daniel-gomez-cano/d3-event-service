@@ -2,13 +2,21 @@ package co.empresa.proyecto_desarrollo3.service;
 
 
 import co.empresa.proyecto_desarrollo3.dto.request.CreateEventRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
+import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.exception.EventAccessDeniedException;
 import co.empresa.proyecto_desarrollo3.exception.EventNotFoundException;
 import co.empresa.proyecto_desarrollo3.model.Event;
 import co.empresa.proyecto_desarrollo3.model.TicketType;
 import co.empresa.proyecto_desarrollo3.model.enums.EventStatus;
 import co.empresa.proyecto_desarrollo3.repository.EventRepository;
+import co.empresa.proyecto_desarrollo3.repository.EventSpecification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,14 +35,8 @@ public class EventService {
 
     // ── US-01: Crear y publicar evento ───────────────────────────────
 
-    /**
-     * Crea un evento en estado DRAFT y lo publica inmediatamente.
-     * El organizerKeycloakId se extrae del JWT en el controller,
-     * nunca del body del request.
-     */
     @Transactional
     public EventResponse createAndPublish(CreateEventRequest request, String organizerKeycloakId) {
-
         Event event = new Event();
         event.setName(request.getName());
         event.setDescription(request.getDescription());
@@ -45,7 +47,6 @@ public class EventService {
         event.setOrganizerKeycloakId(organizerKeycloakId);
         event.setStatus(EventStatus.PUBLISHED);
 
-        // Tipo de boleta por defecto (requerido en US-01)
         int ticketQuantity = request.getDefaultTicketQuantity() != null
                 ? request.getDefaultTicketQuantity()
                 : request.getMaxCapacity();
@@ -56,18 +57,52 @@ public class EventService {
                 request.getDefaultTicketPrice(),
                 ticketQuantity
         );
-
         event.getTicketTypes().add(defaultType);
 
         Event saved = eventRepository.save(event);
         return EventResponse.fromEntity(saved);
     }
 
-    // ── Catálogo público ─────────────────────────────────────────────
+    // ── US-03: Búsqueda y catálogo público ───────────────────────────
 
     /**
-     * Retorna todos los eventos publicados con fecha futura.
-     * Accesible sin autenticación.
+     * Búsqueda paginada con filtros dinámicos.
+     * Si no se envía ningún filtro, retorna todos los eventos
+     * publicados con fecha futura, ordenados por fecha ascendente.
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<EventResponse> searchEvents(EventSearchRequest request) {
+        Specification<Event> spec = EventSpecification.fromSearchRequest(request);
+
+        Pageable pageable = PageRequest.of(
+                request.getPage(),
+                request.getSize(),
+                Sort.by(Sort.Direction.ASC, "eventDate")
+        );
+
+        Page<EventResponse> page = eventRepository
+                .findAll(spec, pageable)
+                .map(EventResponse::fromEntity);
+
+        return PagedResponse.fromPage(page);
+    }
+
+    /**
+     * Detalle completo de un evento por id.
+     * Incluye tipos de boleta activos con cupos restantes.
+     * Solo retorna eventos en estado PUBLISHED.
+     */
+    @Transactional(readOnly = true)
+    public EventResponse getPublishedEventById(Long id) {
+        Event event = eventRepository.findById(id)
+                .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
+                .orElseThrow(() -> new EventNotFoundException(id));
+        return EventResponse.fromEntity(event);
+    }
+
+    /**
+     * Listado simple sin filtros — mantiene compatibilidad con
+     * el endpoint original de US-01.
      */
     @Transactional(readOnly = true)
     public List<EventResponse> getPublishedEvents() {
@@ -78,23 +113,8 @@ public class EventService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Retorna el detalle de un evento por id.
-     * Solo eventos PUBLISHED son visibles públicamente.
-     */
-    @Transactional(readOnly = true)
-    public EventResponse getPublishedEventById(Long id) {
-        Event event = eventRepository.findById(id)
-                .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
-                .orElseThrow(() -> new EventNotFoundException(id));
-        return EventResponse.fromEntity(event);
-    }
-
     // ── Gestión del organizador ──────────────────────────────────────
 
-    /**
-     * Retorna todos los eventos del organizador autenticado.
-     */
     @Transactional(readOnly = true)
     public List<EventResponse> getMyEvents(String organizerKeycloakId) {
         return eventRepository
@@ -104,30 +124,21 @@ public class EventService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Verifica que el evento pertenece al organizador antes de
-     * cualquier operación de modificación.
-     */
-    private Event findOwnedEvent(Long eventId, String organizerKeycloakId) {
-        return eventRepository
-                .findByIdAndOrganizerKeycloakId(eventId, organizerKeycloakId)
-                .orElseThrow(() -> {
-                    // Primero verificar si el evento existe en absoluto
-                    if (!eventRepository.existsById(eventId)) {
-                        return new EventNotFoundException(eventId);
-                    }
-                    // Existe pero no pertenece a este organizador
-                    return new EventAccessDeniedException(eventId);
-                });
-    }
-
-    /**
-     * Cancela un evento del organizador. Usado en US-08.
-     */
     @Transactional
     public EventResponse cancelEvent(Long eventId, String organizerKeycloakId) {
         Event event = findOwnedEvent(eventId, organizerKeycloakId);
         event.setStatus(EventStatus.CANCELLED);
         return EventResponse.fromEntity(eventRepository.save(event));
+    }
+
+    private Event findOwnedEvent(Long eventId, String organizerKeycloakId) {
+        return eventRepository
+                .findByIdAndOrganizerKeycloakId(eventId, organizerKeycloakId)
+                .orElseThrow(() -> {
+                    if (!eventRepository.existsById(eventId)) {
+                        return new EventNotFoundException(eventId);
+                    }
+                    return new EventAccessDeniedException(eventId);
+                });
     }
 }
