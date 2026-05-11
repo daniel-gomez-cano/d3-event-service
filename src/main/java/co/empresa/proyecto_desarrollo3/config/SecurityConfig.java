@@ -37,18 +37,24 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
+                        // ── Endpoints del organizador ────────────────────────
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/my-events").hasRole("EVENT_CREATOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events").hasRole("EVENT_CREATOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("EVENT_CREATOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("EVENT_CREATOR")
+
+                        // ── Endpoints de ordenes ─────────────────────────────
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events/*/reserve").hasRole("ORDER_SERVICE")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events/*/release").hasRole("ORDER_SERVICE")
+
                         // ── Endpoints públicos ───────────────────────────────
                         // Catálogo de eventos: cualquiera puede ver
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/events/{id}").permitAll()
 
                         // Health check para Docker y monitoreo
                         .requestMatchers("/actuator/health").permitAll()
-
-                        // ── Endpoints del organizador ────────────────────────
-                        .requestMatchers(HttpMethod.POST, "/api/v1/events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.GET,  "/api/v1/events/my-events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.PATCH,"/api/v1/events/{id}/cancel").hasRole("EVENT_CREATOR")
 
                         // ── Endpoints de administrador ───────────────────────
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
