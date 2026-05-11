@@ -184,7 +184,8 @@ public class EventService {
         ticketType.incrementSoldQuantity(quantity);
         event.incrementSoldTickets(quantity);
 
-        return EventResponse.fromEntity(event);
+        Event updatedEvent = eventRepository.saveAndFlush(event);
+        return EventResponse.fromEntity(updatedEvent);
     }
 
     @Transactional
