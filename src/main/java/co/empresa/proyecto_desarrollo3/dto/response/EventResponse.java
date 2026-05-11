@@ -24,6 +24,7 @@ public class EventResponse {
     private EventStatus status;
     private List<TicketTypeResponse> ticketTypes;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public static EventResponse fromEntity(Event event) {
         EventResponse dto = new EventResponse();
@@ -38,6 +39,7 @@ public class EventResponse {
         dto.remainingCapacity = event.remainingCapacity();
         dto.status = event.getStatus();
         dto.createdAt = event.getCreatedAt();
+        dto.updatedAt = event.getUpdatedAt();
         dto.ticketTypes = event.getTicketTypes().stream()
                 .filter(TicketType::getActive)
                 .map(TicketTypeResponse::fromEntity)
@@ -85,4 +87,5 @@ public class EventResponse {
     public EventStatus getStatus() { return status; }
     public List<TicketTypeResponse> getTicketTypes() { return ticketTypes; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

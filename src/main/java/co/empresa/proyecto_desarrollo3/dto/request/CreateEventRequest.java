@@ -1,9 +1,11 @@
 package co.empresa.proyecto_desarrollo3.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class CreateEventRequest {
 
@@ -30,18 +32,20 @@ public class CreateEventRequest {
     @Max(value = 100000, message = "El cupo máximo no puede superar 100.000")
     private Integer maxCapacity;
 
-    // Tipo de boleta por defecto (obligatorio en US-01).
-    // En US-02 se permite agregar múltiples tipos.
-    @NotBlank(message = "El nombre del tipo de boleta es obligatorio")
-    private String defaultTicketTypeName;
+    @NotEmpty(message = "Debe incluir al menos un tipo de boleta")
+    @Valid
+    private List<TicketTypeRequest> ticketTypes;
 
-    @NotNull(message = "El precio del tipo de boleta es obligatorio")
-    @DecimalMin(value = "0.0", inclusive = true, message = "El precio no puede ser negativo")
-    private BigDecimal defaultTicketPrice;
-
-    // Si no se envía, se usa maxCapacity como cantidad del tipo por defecto
-    @Min(value = 1, message = "La cantidad del tipo de boleta debe ser al menos 1")
-    private Integer defaultTicketQuantity;
+    @AssertTrue(message = "La suma de cantidades de boletas no puede superar el cupo maximo")
+    public boolean isTicketTypesWithinCapacity() {
+        if (ticketTypes == null || ticketTypes.isEmpty() || maxCapacity == null) {
+            return true;
+        }
+        int total = ticketTypes.stream()
+                .mapToInt(TicketTypeRequest::getQuantity)
+                .sum();
+        return total <= maxCapacity;
+    }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -61,18 +65,31 @@ public class CreateEventRequest {
     public Integer getMaxCapacity() { return maxCapacity; }
     public void setMaxCapacity(Integer maxCapacity) { this.maxCapacity = maxCapacity; }
 
-    public String getDefaultTicketTypeName() { return defaultTicketTypeName; }
-    public void setDefaultTicketTypeName(String defaultTicketTypeName) {
-        this.defaultTicketTypeName = defaultTicketTypeName;
+    public List<TicketTypeRequest> getTicketTypes() { return ticketTypes; }
+    public void setTicketTypes(List<TicketTypeRequest> ticketTypes) {
+        this.ticketTypes = ticketTypes;
     }
 
-    public BigDecimal getDefaultTicketPrice() { return defaultTicketPrice; }
-    public void setDefaultTicketPrice(BigDecimal defaultTicketPrice) {
-        this.defaultTicketPrice = defaultTicketPrice;
-    }
+    public static class TicketTypeRequest {
 
-    public Integer getDefaultTicketQuantity() { return defaultTicketQuantity; }
-    public void setDefaultTicketQuantity(Integer defaultTicketQuantity) {
-        this.defaultTicketQuantity = defaultTicketQuantity;
+        @NotBlank(message = "El nombre del tipo de boleta es obligatorio")
+        private String name;
+
+        @NotNull(message = "El precio del tipo de boleta es obligatorio")
+        @DecimalMin(value = "0.0", inclusive = true, message = "El precio no puede ser negativo")
+        private BigDecimal price;
+
+        @NotNull(message = "La cantidad del tipo de boleta es obligatoria")
+        @Min(value = 1, message = "La cantidad del tipo de boleta debe ser al menos 1")
+        private Integer quantity;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+
+        public BigDecimal getPrice() { return price; }
+        public void setPrice(BigDecimal price) { this.price = price; }
+
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
     }
 }
