@@ -53,6 +53,31 @@ public class TicketType {
         return availableQuantity - soldQuantity;
     }
 
+    /**
+     * Incrementa el contador de boletas vendidas para este tipo.
+     */
+    public void incrementSoldQuantity(int quantity) {
+        if (!hasStock(quantity)) {
+            throw new IllegalStateException(
+                    "No hay stock suficiente. Disponibles: " + remainingStock()
+            );
+        }
+        this.soldQuantity += quantity;
+    }
+
+    /**
+     * Decrementa el contador de boletas vendidas para este tipo.
+     */
+    public void decrementSoldQuantity(int quantity) {
+        if (quantity < 1) {
+            throw new IllegalArgumentException("La cantidad debe ser al menos 1");
+        }
+        if (soldQuantity < quantity) {
+            throw new IllegalStateException("No hay suficientes boletas para liberar");
+        }
+        this.soldQuantity -= quantity;
+    }
+
     public Long getId() { return id; }
 
     public Event getEvent() { return event; }

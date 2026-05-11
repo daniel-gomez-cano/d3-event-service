@@ -90,6 +90,19 @@ public class Event {
         this.soldTickets += quantity;
     }
 
+    /**
+     * Decrementa el contador de boletas vendidas.
+     */
+    public void decrementSoldTickets(int quantity) {
+        if (quantity < 1) {
+            throw new IllegalArgumentException("La cantidad debe ser al menos 1");
+        }
+        if (soldTickets < quantity) {
+            throw new IllegalStateException("No hay suficientes boletas para liberar");
+        }
+        this.soldTickets -= quantity;
+    }
+
     // ── Getters y Setters ────────────────────────────────────────────
 
     public Long getId() { return id; }
