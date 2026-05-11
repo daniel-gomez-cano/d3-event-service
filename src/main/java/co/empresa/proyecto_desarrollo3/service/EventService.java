@@ -3,15 +3,19 @@ package co.empresa.proyecto_desarrollo3.service;
 
 import co.empresa.proyecto_desarrollo3.dto.request.CreateEventRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.ReleaseTicketRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.ReserveTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
 import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.exception.EventAccessDeniedException;
+import co.empresa.proyecto_desarrollo3.exception.EventCapacityExceededException;
 import co.empresa.proyecto_desarrollo3.exception.EventNotFoundException;
 import co.empresa.proyecto_desarrollo3.model.Event;
 import co.empresa.proyecto_desarrollo3.model.TicketType;
 import co.empresa.proyecto_desarrollo3.model.enums.EventStatus;
 import co.empresa.proyecto_desarrollo3.repository.EventRepository;
 import co.empresa.proyecto_desarrollo3.repository.EventSpecification;
+import co.empresa.proyecto_desarrollo3.repository.TicketTypeRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,15 +32,17 @@ import java.util.stream.Collectors;
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final TicketTypeRepository ticketTypeRepository;
 
-    public EventService(EventRepository eventRepository) {
+    public EventService(EventRepository eventRepository, TicketTypeRepository ticketTypeRepository) {
         this.eventRepository = eventRepository;
+        this.ticketTypeRepository = ticketTypeRepository;
     }
 
-    // ── US-01: Crear y publicar evento ───────────────────────────────
+    // ── US-01: Crear evento (borrador) ───────────────────────────────
 
     @Transactional
-    public EventResponse createAndPublish(CreateEventRequest request, String organizerKeycloakId) {
+    public EventResponse createDraft(CreateEventRequest request, String organizerKeycloakId) {
         Event event = new Event();
         event.setName(request.getName());
         event.setDescription(request.getDescription());
@@ -45,22 +51,29 @@ public class EventService {
         event.setImageUrl(request.getImageUrl());
         event.setMaxCapacity(request.getMaxCapacity());
         event.setOrganizerKeycloakId(organizerKeycloakId);
-        event.setStatus(EventStatus.PUBLISHED);
+        event.setStatus(EventStatus.DRAFT);
 
-        int ticketQuantity = request.getDefaultTicketQuantity() != null
-                ? request.getDefaultTicketQuantity()
-                : request.getMaxCapacity();
-
-        TicketType defaultType = new TicketType(
-                event,
-                request.getDefaultTicketTypeName(),
-                request.getDefaultTicketPrice(),
-                ticketQuantity
-        );
-        event.getTicketTypes().add(defaultType);
+        List<TicketType> ticketTypes = buildTicketTypes(request, event);
+        event.getTicketTypes().addAll(ticketTypes);
 
         Event saved = eventRepository.save(event);
         return EventResponse.fromEntity(saved);
+    }
+
+    // ── US-01: Publicar evento (organizador) ─────────────────────────
+
+    @Transactional
+    public EventResponse publishEvent(Long eventId, String organizerKeycloakId) {
+        Event event = findOwnedEvent(eventId, organizerKeycloakId);
+
+        if (event.getStatus() != EventStatus.DRAFT) {
+            throw new IllegalStateException("Solo eventos en borrador pueden publicarse");
+        }
+
+        validatePublishRules(event);
+        event.setStatus(EventStatus.PUBLISHED);
+
+        return EventResponse.fromEntity(eventRepository.save(event));
     }
 
     // ── US-03: Búsqueda y catálogo público ───────────────────────────
@@ -94,9 +107,11 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public EventResponse getPublishedEventById(Long id) {
+        LocalDateTime now = LocalDateTime.now();
         Event event = eventRepository.findById(id)
-                .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
-                .orElseThrow(() -> new EventNotFoundException(id));
+            .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
+            .filter(e -> e.getEventDate().isAfter(now))
+            .orElseThrow(() -> new EventNotFoundException(id));
         return EventResponse.fromEntity(event);
     }
 
@@ -131,6 +146,70 @@ public class EventService {
         return EventResponse.fromEntity(eventRepository.save(event));
     }
 
+    // ── US-05: Reservar cupos (Order Service) ───────────────────────
+
+    @Transactional
+    public EventResponse reserveTickets(Long eventId, ReserveTicketRequest request) {
+        Event event = eventRepository.findByIdForUpdate(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+
+        if (event.getStatus() != EventStatus.PUBLISHED) {
+            throw new IllegalStateException("El evento no esta publicado");
+        }
+
+        if (!event.getEventDate().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("El evento no esta disponible para venta");
+        }
+
+        TicketType ticketType = ticketTypeRepository
+                .findByIdAndEventIdForUpdate(request.getTicketTypeId(), eventId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Tipo de boleta no encontrado para el evento"
+                ));
+
+        if (!Boolean.TRUE.equals(ticketType.getActive())) {
+            throw new IllegalStateException("El tipo de boleta no esta activo");
+        }
+
+        int quantity = request.getQuantity();
+
+        if (!ticketType.hasStock(quantity)) {
+            throw new EventCapacityExceededException(ticketType.remainingStock());
+        }
+
+        if (!event.hasAvailableCapacity(quantity)) {
+            throw new EventCapacityExceededException(event.remainingCapacity());
+        }
+
+        ticketType.incrementSoldQuantity(quantity);
+        event.incrementSoldTickets(quantity);
+
+        return EventResponse.fromEntity(event);
+    }
+
+    @Transactional
+    public EventResponse releaseTickets(Long eventId, ReleaseTicketRequest request) {
+        Event event = eventRepository.findByIdForUpdate(eventId)
+                .orElseThrow(() -> new EventNotFoundException(eventId));
+
+        if (event.getStatus() == EventStatus.DRAFT) {
+            throw new IllegalStateException("El evento no esta publicado");
+        }
+
+        TicketType ticketType = ticketTypeRepository
+                .findByIdAndEventIdForUpdate(request.getTicketTypeId(), eventId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Tipo de boleta no encontrado para el evento"
+                ));
+
+        int quantity = request.getQuantity();
+
+        ticketType.decrementSoldQuantity(quantity);
+        event.decrementSoldTickets(quantity);
+
+        return EventResponse.fromEntity(event);
+    }
+
     private Event findOwnedEvent(Long eventId, String organizerKeycloakId) {
         return eventRepository
                 .findByIdAndOrganizerKeycloakId(eventId, organizerKeycloakId)
@@ -140,5 +219,50 @@ public class EventService {
                     }
                     return new EventAccessDeniedException(eventId);
                 });
+    }
+
+    private List<TicketType> buildTicketTypes(CreateEventRequest request, Event event) {
+        int totalQuantity = request.getTicketTypes().stream()
+                .mapToInt(CreateEventRequest.TicketTypeRequest::getQuantity)
+                .sum();
+
+        if (totalQuantity > request.getMaxCapacity()) {
+            throw new IllegalArgumentException(
+                    "La suma de cantidades de boletas no puede superar el cupo maximo"
+            );
+        }
+
+        return request.getTicketTypes().stream()
+                .map(tt -> new TicketType(
+                        event,
+                        tt.getName(),
+                        tt.getPrice(),
+                        tt.getQuantity()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    private void validatePublishRules(Event event) {
+        if (!event.getEventDate().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("La fecha del evento debe ser futura");
+        }
+
+        List<TicketType> activeTypes = event.getTicketTypes().stream()
+                .filter(TicketType::getActive)
+                .collect(Collectors.toList());
+
+        if (activeTypes.isEmpty()) {
+            throw new IllegalStateException("Debe existir al menos un tipo de boleta activo");
+        }
+
+        int totalQuantity = activeTypes.stream()
+                .mapToInt(TicketType::getAvailableQuantity)
+                .sum();
+
+        if (totalQuantity > event.getMaxCapacity()) {
+            throw new IllegalStateException(
+                    "La suma de cantidades de boletas no puede superar el cupo maximo"
+            );
+        }
     }
 }

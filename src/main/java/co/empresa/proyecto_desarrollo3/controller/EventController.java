@@ -2,6 +2,8 @@ package co.empresa.proyecto_desarrollo3.controller;
 
 import co.empresa.proyecto_desarrollo3.dto.request.CreateEventRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.ReleaseTicketRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.ReserveTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
 import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.service.EventService;
@@ -11,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -88,7 +89,16 @@ public class EventController {
         String organizerKeycloakId = jwt.getSubject();
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(eventService.createAndPublish(request, organizerKeycloakId));
+                .body(eventService.createDraft(request, organizerKeycloakId));
+    }
+
+    @PatchMapping("/{id}/publish")
+    @PreAuthorize("hasRole('EVENT_CREATOR')")
+    public ResponseEntity<EventResponse> publishEvent(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ResponseEntity.ok(eventService.publishEvent(id, jwt.getSubject()));
     }
 
     @GetMapping("/my-events")
@@ -106,5 +116,23 @@ public class EventController {
             @AuthenticationPrincipal Jwt jwt) {
 
         return ResponseEntity.ok(eventService.cancelEvent(id, jwt.getSubject()));
+    }
+
+    @PostMapping("/{id}/reserve")
+    @PreAuthorize("hasRole('ORDER_SERVICE')")
+    public ResponseEntity<EventResponse> reserveTickets(
+            @PathVariable Long id,
+            @Valid @RequestBody ReserveTicketRequest request) {
+
+        return ResponseEntity.ok(eventService.reserveTickets(id, request));
+    }
+
+    @PostMapping("/{id}/release")
+    @PreAuthorize("hasRole('ORDER_SERVICE')")
+    public ResponseEntity<EventResponse> releaseTickets(
+            @PathVariable Long id,
+            @Valid @RequestBody ReleaseTicketRequest request) {
+
+        return ResponseEntity.ok(eventService.releaseTickets(id, request));
     }
 }
