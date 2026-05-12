@@ -7,10 +7,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,6 +34,7 @@ public interface EventRepository extends JpaRepository<Event, Long>,
     List<Event> findUpcomingPublishedEvents(@Param("now") LocalDateTime now);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
     @Query("SELECT e FROM Event e WHERE e.id = :id")
     Optional<Event> findByIdForUpdate(@Param("id") Long id);
 
