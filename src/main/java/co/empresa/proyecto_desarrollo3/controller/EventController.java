@@ -5,6 +5,7 @@ import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.ReleaseTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.ReserveTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
+import co.empresa.proyecto_desarrollo3.dto.response.EventListItemResponse;
 import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.service.EventService;
 import jakarta.validation.Valid;
@@ -14,8 +15,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/events")
@@ -27,38 +26,37 @@ public class EventController {
         this.eventService = eventService;
     }
 
-    // ── US-03: Búsqueda con filtros (público) ────────────────────────
+    // ── US-03: Listado con filtros (público) ────────────────────────
 
     /**
-     * GET /api/v1/events/search
+     * GET /api/v1/events
      *
      * Búsqueda paginada con filtros opcionales.
-     * Todos los parámetros son opcionales — sin filtros retorna
-     * todos los eventos publicados próximos.
+     * Sin filtros de fecha, retorna todos los eventos publicados.
+     *
+     * Paginación: page (default 1), limit (default 12, max 50)
      *
      * Ejemplos:
-     *   GET /api/v1/events/search
-     *   GET /api/v1/events/search?keyword=rock
-     *   GET /api/v1/events/search?location=bogota
-     *   GET /api/v1/events/search?dateFrom=2025-06-01&dateTo=2025-06-30
-     *   GET /api/v1/events/search?keyword=jazz&location=cali&page=0&size=10
+     *   GET /api/v1/events
+     *   GET /api/v1/events?keyword=rock
+     *   GET /api/v1/events?location=bogota
+     *   GET /api/v1/events?dateFrom=2025-06-01&dateTo=2025-06-30
+     *   GET /api/v1/events?keyword=jazz&location=cali&page=1&limit=12
      */
-    @GetMapping("/search")
-    public ResponseEntity<PagedResponse<EventResponse>> searchEvents(
+    @GetMapping
+    public ResponseEntity<PagedResponse<EventListItemResponse>> searchEvents(
             @ModelAttribute EventSearchRequest request) {
         return ResponseEntity.ok(eventService.searchEvents(request));
     }
 
-    // ── US-01: Catálogo simple (público) ─────────────────────────────
-
     /**
-     * GET /api/v1/events
-     * Listado simple sin filtros ni paginación.
-     * Mantenido por compatibilidad con US-01.
+     * GET /api/v1/events/search
+     * Alias temporal para compatibilidad hacia atrás.
      */
-    @GetMapping
-    public ResponseEntity<List<EventResponse>> getPublishedEvents() {
-        return ResponseEntity.ok(eventService.getPublishedEvents());
+    @GetMapping("/search")
+    public ResponseEntity<PagedResponse<EventListItemResponse>> searchEventsAlias(
+            @ModelAttribute EventSearchRequest request) {
+        return ResponseEntity.ok(eventService.searchEvents(request));
     }
 
     // ── US-03: Detalle de evento (público) ───────────────────────────
@@ -70,7 +68,7 @@ public class EventController {
      * - Información general (nombre, fecha, lugar, imagen)
      * - Tipos de boleta activos con precio y cupos restantes
      *
-    * Solo eventos en estado PUBLISHED y con fecha futura son visibles.
+        * Solo eventos en estado PUBLISHED son visibles.
      * Retorna 404 si el evento no existe o no está publicado.
      */
     @GetMapping("/{id}")

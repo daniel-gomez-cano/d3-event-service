@@ -10,7 +10,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "events")
+@Table(
+    name = "events",
+    indexes = {
+        @Index(name = "idx_events_status", columnList = "status"),
+        @Index(name = "idx_events_event_date", columnList = "event_date"),
+        @Index(name = "idx_events_location", columnList = "location"),
+        @Index(name = "idx_events_name", columnList = "name"),
+        @Index(name = "idx_events_description", columnList = "description")
+    }
+)
 public class Event {
 
     @Id
