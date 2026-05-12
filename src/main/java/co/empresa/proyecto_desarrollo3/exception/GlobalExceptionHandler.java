@@ -7,6 +7,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PessimisticLockException;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,6 +66,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    // ── Contencion por bloqueo ──────────────────────────────────────
+    @ExceptionHandler({PessimisticLockException.class, LockTimeoutException.class})
+    public ResponseEntity<ErrorResponse> handleLockTimeout(RuntimeException ex) {
+        return buildError(HttpStatus.CONFLICT, "Operacion en contencion, reintente");
     }
 
     private ResponseEntity<ErrorResponse> buildError(HttpStatus status, String message) {

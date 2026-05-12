@@ -70,7 +70,7 @@ public class EventController {
      * - Información general (nombre, fecha, lugar, imagen)
      * - Tipos de boleta activos con precio y cupos restantes
      *
-     * Solo eventos en estado PUBLISHED son visibles.
+    * Solo eventos en estado PUBLISHED y con fecha futura son visibles.
      * Retorna 404 si el evento no existe o no está publicado.
      */
     @GetMapping("/{id}")

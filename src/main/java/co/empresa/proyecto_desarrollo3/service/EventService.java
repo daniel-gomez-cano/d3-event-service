@@ -103,7 +103,7 @@ public class EventService {
     /**
      * Detalle completo de un evento por id.
      * Incluye tipos de boleta activos con cupos restantes.
-     * Solo retorna eventos en estado PUBLISHED.
+        * Solo retorna eventos en estado PUBLISHED y con fecha futura.
      */
     @Transactional(readOnly = true)
     public EventResponse getPublishedEventById(Long id) {
@@ -208,7 +208,8 @@ public class EventService {
         ticketType.decrementSoldQuantity(quantity);
         event.decrementSoldTickets(quantity);
 
-        return EventResponse.fromEntity(event);
+        Event updatedEvent = eventRepository.saveAndFlush(event);
+        return EventResponse.fromEntity(updatedEvent);
     }
 
     private Event findOwnedEvent(Long eventId, String organizerKeycloakId) {
