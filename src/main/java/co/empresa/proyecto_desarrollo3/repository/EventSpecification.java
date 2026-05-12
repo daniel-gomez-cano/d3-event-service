@@ -6,7 +6,6 @@ import co.empresa.proyecto_desarrollo3.model.enums.EventStatus;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,9 +26,6 @@ public class EventSpecification {
 
             // Siempre filtrar solo eventos publicados
             predicates.add(cb.equal(root.get("status"), EventStatus.PUBLISHED));
-
-            // Siempre mostrar solo eventos con fecha futura
-            predicates.add(cb.greaterThan(root.get("eventDate"), LocalDateTime.now()));
 
             // Filtro por palabra clave (nombre o descripción)
             if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
