@@ -16,7 +16,7 @@ public class PagedResponse<T> {
     public static <T> PagedResponse<T> fromPage(Page<T> page) {
         PagedResponse<T> response = new PagedResponse<>();
         response.content = page.getContent();
-        response.page = page.getNumber();
+        response.page = page.getNumber() + 1;
         response.size = page.getSize();
         response.totalElements = page.getTotalElements();
         response.totalPages = page.getTotalPages();

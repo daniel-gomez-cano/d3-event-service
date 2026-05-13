@@ -7,6 +7,7 @@ import co.empresa.proyecto_desarrollo3.model.enums.EventStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,6 +22,8 @@ public class EventResponse {
     private Integer maxCapacity;
     private Integer soldTickets;
     private Integer remainingCapacity;
+    private BigDecimal minPrice;
+    private boolean soldOut;
     private EventStatus status;
     private List<TicketTypeResponse> ticketTypes;
     private LocalDateTime createdAt;
@@ -40,10 +43,21 @@ public class EventResponse {
         dto.status = event.getStatus();
         dto.createdAt = event.getCreatedAt();
         dto.updatedAt = event.getUpdatedAt();
-        dto.ticketTypes = event.getTicketTypes().stream()
-                .filter(TicketType::getActive)
-                .map(TicketTypeResponse::fromEntity)
-                .collect(Collectors.toList());
+        List<TicketType> activeTypes = event.getTicketTypes().stream()
+            .filter(TicketType::getActive)
+            .collect(Collectors.toList());
+
+        dto.ticketTypes = activeTypes.stream()
+            .map(TicketTypeResponse::fromEntity)
+            .collect(Collectors.toList());
+
+        dto.minPrice = activeTypes.stream()
+            .map(TicketType::getPrice)
+            .min(Comparator.naturalOrder())
+            .orElse(null);
+
+        dto.soldOut = !activeTypes.isEmpty()
+            && activeTypes.stream().allMatch(tt -> tt.remainingStock() <= 0);
         return dto;
     }
 
@@ -84,6 +98,8 @@ public class EventResponse {
     public Integer getMaxCapacity() { return maxCapacity; }
     public Integer getSoldTickets() { return soldTickets; }
     public Integer getRemainingCapacity() { return remainingCapacity; }
+    public BigDecimal getMinPrice() { return minPrice; }
+    public boolean isSoldOut() { return soldOut; }
     public EventStatus getStatus() { return status; }
     public List<TicketTypeResponse> getTicketTypes() { return ticketTypes; }
     public LocalDateTime getCreatedAt() { return createdAt; }
