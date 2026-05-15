@@ -1,0 +1,31 @@
+# Relato del gerente de VivaEventos – plataforma de eventos y boletería
+
+Equipo, les cuento el contexto tal como lo vivimos acá en VivaEventos S.A.S. para que ustedes hagan el análisis y saquen de ahí lo que necesiten (funcional, no funcional, restricciones, riesgos, etc.).
+
+Nosotros vendemos experiencias: conciertos, talleres, conferencias, ferias. El problema es que hoy la mayoría de organizadores se mueve por WhatsApp, con listas en Excel, consignaciones y capturas de pantalla. Eso nos está generando tres dolores: se nos van ventas (la gente se cansa), se cuelan (fraude y reventa) y no controlamos el aforo.
+
+Yo necesito que ustedes construyan el backend del MVP en 13 semanas, porque ya tengo conversaciones abiertas con organizadores de dos ciudades y me están pidiendo una fecha para pruebas.
+
+La idea es sencilla: el organizador publica un evento, define cuántas boletas quiere vender y en qué condiciones. La gente entra, encuentra el evento, compra, paga, y recibe una boleta digital para entrar. En la entrada, el personal de logística escanea un QR y valida que esa boleta sea real y no se haya usado antes. Y yo como gerente necesito ver qué está pasando en tiempo real: cuántas se han vendido, en qué horas se vende más, dónde se nos cae la compra, y si hubo problemas con pagos o con ingreso.
+
+Ahora, para que entiendan la presión real: cuando un organizador anuncia “venta abierta”, se nos puede meter mucha gente al mismo tiempo. Yo he visto picos de miles intentando comprar en los primeros minutos. En esos momentos, si la plataforma se pone lenta o se cae, el organizador nos quema en redes y perdemos el cliente. Tampoco puedo permitir que se vendan más boletas de las que hay, porque el día del evento eso se vuelve un caos y un problema de seguridad.
+
+Hay un detalle clave: la compra no es “solo registrar una orden”. La gente quiere escoger el tipo de boleta (general, VIP, estudiante), a veces quieren aplicar un código de descuento, y muchas veces intentan pagar y el pago falla o queda “pendiente”. En Colombia, y en general en pasarelas, es normal que el pago quede en estado intermedio y llegue confirmación después. Entonces no me sirve que el sistema se confunda y termine cobrando dos veces, o que marque como pagado algo que no está confirmado. Si el cliente paga y no le llega boleta, me llaman a mí, no a ustedes.
+
+Por eso yo quiero que el sistema esté conectado con una pasarela de pagos real, aunque sea en modo pruebas. No quiero simulaciones “de mentiras”; necesito por lo menos un sandbox real donde se vea el flujo, estados, callbacks, confirmaciones, etc. Lo mismo con notificaciones: el cliente espera un correo o un mensaje confirmando compra, recordando el evento, avisando cambios o cancelaciones. Si la notificación no sale en el momento, no me pueden tumbar la venta por eso: prefiero que quede pendiente y salga después. Pero que quede trazable.
+
+También hay cosas operativas: el organizador va a querer cambiar precios, cupos, activar o desactivar códigos promocionales. Y nosotros necesitamos dejar rastro de esas acciones: quién hizo qué, cuándo y por qué, porque después aparecen reclamos. Si un evento se cancela, yo necesito un camino claro para comunicarlo y manejar lo que corresponda con devolución, según lo que permita la pasarela y lo que el organizador haya definido. No quiero “inventos” manuales que dependan de que alguien se acuerde.
+
+En cuanto a la entrada al evento, eso tiene que ser rápido. La fila no puede pararse porque el sistema se demoró validando un QR. Y ojo con esto: en conciertos grandes, el personal de logística está con celular y señal regular. A veces hay congestión en la red. Yo necesito que la validación sea eficiente y que el sistema tenga una forma clara de responder incluso si las condiciones no son perfectas. Al mismo tiempo, necesito que una boleta no se use dos veces: si alguien la reenvía o la revende, debe quedar bloqueado en el segundo intento.
+
+Respecto a cómo lo vamos a construir: acá no quiero un “sistema todo en uno”. Quiero una solución que podamos crecer por partes y que no se caiga todo si una parte falla. En la empresa vamos a tener equipos distintos trabajando, así que necesito que esté separado en servicios con responsabilidades claras. No quiero que un servicio toque la base de datos de otro como atajo, porque después eso no lo mantiene nadie. Si una parte como notificaciones se cae, no quiero que por eso se caiga la compra. Si la pasarela se pone lenta, necesito que el sistema lo maneje de forma controlada, sin colgarse.
+
+También les digo lo básico de seguridad y operación: acá vamos a manejar datos personales y transacciones. Yo no puedo exponer llaves, tokens o secretos en el código. Y no puedo permitir que cualquier usuario haga acciones de organizador o de administrador. Necesito roles, permisos y control de acceso. Todo lo que salga hacia afuera debe ir protegido. Y cuando haya un incidente, necesito poder reconstruir qué pasó: “este usuario creó la orden, se intentó pagar, la pasarela respondió X, luego se confirmó, luego se generó el ticket, luego se envió el mensaje”. Si eso no se puede rastrear, soporte queda ciego.
+
+Para que esto sea viable en 13 semanas, yo necesito que ustedes entreguen por partes, no todo al final. Quiero poder ver el flujo completo funcionando en un entorno levantable, repetible, que se pueda mostrar sin rogarle a nadie. Idealmente con contenedores para que el equipo de pruebas lo pueda levantar fácil. Y en el repositorio debe quedar explicado cómo se levanta, cómo se prueba, qué endpoints hay, y cómo se verifica el flujo de compra y validación.
+
+Ah, y algo más: no estamos construyendo la NASA. No necesito motor de recomendaciones con IA, ni app móvil nativa, ni contabilidad completa. Necesito lo esencial, pero bien hecho, porque esto va a estar de cara a clientes reales. Y necesito que si mañana pasamos de dos ciudades a diez, el sistema no toque rehacerlo de cero, sino que pueda crecer.
+
+## Resumen
+
+Les estoy pidiendo un backend que sostenga el negocio real de eventos, con ventas masivas en momentos puntuales, integración con pagos y notificaciones externas, boletas digitales con QR y validación en puerta, trazabilidad para soporte y un diseño por servicios que aguante crecimiento y fallas sin tumbarlo todo.

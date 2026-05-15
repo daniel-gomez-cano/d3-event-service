@@ -1,0 +1,32 @@
+package co.empresa.proyecto_desarrollo3.repository;
+
+import co.empresa.proyecto_desarrollo3.model.TicketType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface TicketTypeRepository extends JpaRepository<TicketType, Long> {
+
+    List<TicketType> findByEventId(Long eventId);
+
+    List<TicketType> findByEventIdAndActiveTrue(Long eventId);
+
+    Optional<TicketType> findByIdAndEventId(Long id, Long eventId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
+    @Query("SELECT tt FROM TicketType tt WHERE tt.id = :id AND tt.event.id = :eventId")
+    Optional<TicketType> findByIdAndEventIdForUpdate(
+            @Param("id") Long id,
+            @Param("eventId") Long eventId);
+}
