@@ -1,0 +1,50 @@
+services:
+  # Base de datos exclusiva para event-service
+  event-db:
+    image: postgres:16-alpine
+    container_name: event-db
+    environment:
+      POSTGRES_DB: ${EVENT_DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432" # Cuidado con este puerto si ya está ocupado
+    volumes:
+      - event-db-data:/var/lib/postgresql/data
+    networks:
+      - viva-eventos-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${EVENT_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Event-service
+  event-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: event-service
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8081}
+      DB_URL: jdbc:postgresql://event-db:5432/${EVENT_DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # Keycloak viene del auth-service (externo)
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI}
+    ports:
+      - "8081:8081"   # Cambia si ya tienes algo en 8081
+    depends_on:
+      event-db:
+        condition: service_healthy
+    networks:
+      - viva-eventos-net
+    restart: unless-stopped
+
+volumes:
+  event-db-data:
+
+networks:
+  viva-eventos-net:
+    external: true   # Red compartida creada en auth-service

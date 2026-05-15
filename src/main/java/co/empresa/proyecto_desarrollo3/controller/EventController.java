@@ -16,6 +16,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/events")
 public class EventController {
@@ -79,7 +81,7 @@ public class EventController {
     // ── US-01: Crear evento (organizador) ────────────────────────────
 
     @PostMapping
-    @PreAuthorize("hasRole('EVENT_CREATOR')")
+    @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<EventResponse> createEvent(
             @Valid @RequestBody CreateEventRequest request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -91,7 +93,7 @@ public class EventController {
     }
 
     @PatchMapping("/{id}/publish")
-    @PreAuthorize("hasRole('EVENT_CREATOR')")
+    @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<EventResponse> publishEvent(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -100,7 +102,7 @@ public class EventController {
     }
 
     @GetMapping("/my-events")
-    @PreAuthorize("hasRole('EVENT_CREATOR')")
+    @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<List<EventResponse>> getMyEvents(
             @AuthenticationPrincipal Jwt jwt) {
 
@@ -108,7 +110,7 @@ public class EventController {
     }
 
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasRole('EVENT_CREATOR')")
+    @PreAuthorize("hasRole('ORGANIZER')")
     public ResponseEntity<EventResponse> cancelEvent(
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
