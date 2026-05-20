@@ -38,10 +38,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // ── Endpoints del organizador ────────────────────────
-                        .requestMatchers(HttpMethod.GET, "/api/v1/events/my-events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("EVENT_CREATOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/my-events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("ORGANIZER")
 
                         // ── Endpoints de ordenes ─────────────────────────────
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/reserve").hasRole("ORDER_SERVICE")
@@ -77,7 +77,7 @@ public class SecurityConfig {
      * Converter que extrae los roles desde el claim de Keycloak.
      *
      * Keycloak pone los roles en una estructura anidada:
-     *   "realm_access": { "roles": ["ROLE_ADMIN", "ROLE_EVENT_CREATOR"] }
+        *   "realm_access": { "roles": ["ROLE_ADMIN", "ROLE_ORGANIZER"] }
      *
      * Spring Security espera GrantedAuthority con prefijo "ROLE_".
      * Este converter hace la traducción automáticamente.

@@ -20,7 +20,7 @@ public class TestJwtConfig {
                 .header("alg", "none")
                 .claim("sub", "test-user")
                 .claim("realm_access", Map.of("roles", List.of(
-                        "ROLE_EVENT_CREATOR",
+                        "ROLE_ORGANIZER",
                         "ROLE_ORDER_SERVICE"
                 )))
                 .issuedAt(Instant.now())

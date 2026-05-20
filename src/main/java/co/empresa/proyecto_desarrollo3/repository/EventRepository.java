@@ -14,7 +14,6 @@ import org.springframework.stereotype.Repository;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,9 +28,6 @@ public interface EventRepository extends JpaRepository<Event, Long>,
     Optional<Event> findByIdAndOrganizerKeycloakId(Long id, String organizerKeycloakId);
 
     List<Event> findByOrganizerKeycloakIdAndStatus(String organizerKeycloakId, EventStatus status);
-
-    @Query("SELECT e FROM Event e WHERE e.status = 'PUBLISHED' AND e.eventDate > :now ORDER BY e.eventDate ASC")
-    List<Event> findUpcomingPublishedEvents(@Param("now") LocalDateTime now);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))

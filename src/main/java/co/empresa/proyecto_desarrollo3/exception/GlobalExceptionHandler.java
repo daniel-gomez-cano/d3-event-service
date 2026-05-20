@@ -68,6 +68,12 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    // ── Error de validación semántica (422) ─────────────────────────
+    @ExceptionHandler(UnprocessableEntityException.class)
+    public ResponseEntity<ErrorResponse> handleUnprocessable(UnprocessableEntityException ex) {
+        return buildError(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
     // ── Contencion por bloqueo ──────────────────────────────────────
     @ExceptionHandler({PessimisticLockException.class, LockTimeoutException.class})
     public ResponseEntity<ErrorResponse> handleLockTimeout(RuntimeException ex) {

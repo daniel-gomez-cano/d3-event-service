@@ -19,9 +19,9 @@ public class EventSearchRequest {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate dateTo;
 
-    // Paginación
-    private int page = 0;
-    private int size = 20;
+    // Paginacion (1-based)
+    private int page = 1;
+    private int limit = 12;
 
     public String getKeyword() { return keyword; }
     public void setKeyword(String keyword) { this.keyword = keyword; }
@@ -36,11 +36,8 @@ public class EventSearchRequest {
     public void setDateTo(LocalDate dateTo) { this.dateTo = dateTo; }
 
     public int getPage() { return page; }
-    public void setPage(int page) { this.page = Math.max(0, page); }
+    public void setPage(int page) { this.page = page; }
 
-    public int getSize() { return size; }
-    public void setSize(int size) {
-        // Máximo 50 resultados por página para proteger el servidor
-        this.size = Math.min(size, 50);
-    }
+    public int getLimit() { return limit; }
+    public void setLimit(int limit) { this.limit = limit; }
 }

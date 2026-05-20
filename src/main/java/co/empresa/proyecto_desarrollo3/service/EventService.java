@@ -5,11 +5,13 @@ import co.empresa.proyecto_desarrollo3.dto.request.CreateEventRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.EventSearchRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.ReleaseTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.request.ReserveTicketRequest;
+import co.empresa.proyecto_desarrollo3.dto.response.EventListItemResponse;
 import co.empresa.proyecto_desarrollo3.dto.response.EventResponse;
 import co.empresa.proyecto_desarrollo3.dto.response.PagedResponse;
 import co.empresa.proyecto_desarrollo3.exception.EventAccessDeniedException;
 import co.empresa.proyecto_desarrollo3.exception.EventCapacityExceededException;
 import co.empresa.proyecto_desarrollo3.exception.EventNotFoundException;
+import co.empresa.proyecto_desarrollo3.exception.UnprocessableEntityException;
 import co.empresa.proyecto_desarrollo3.model.Event;
 import co.empresa.proyecto_desarrollo3.model.TicketType;
 import co.empresa.proyecto_desarrollo3.model.enums.EventStatus;
@@ -80,22 +82,25 @@ public class EventService {
 
     /**
      * Búsqueda paginada con filtros dinámicos.
-     * Si no se envía ningún filtro, retorna todos los eventos
-     * publicados con fecha futura, ordenados por fecha ascendente.
+         * Si no se envía ningún filtro de fecha, retorna todos los eventos
+         * publicados, ordenados por fecha ascendente.
      */
     @Transactional(readOnly = true)
-    public PagedResponse<EventResponse> searchEvents(EventSearchRequest request) {
+    public PagedResponse<EventListItemResponse> searchEvents(EventSearchRequest request) {
+        validateSearchRequest(request);
         Specification<Event> spec = EventSpecification.fromSearchRequest(request);
 
+        int pageIndex = request.getPage() - 1;
+
         Pageable pageable = PageRequest.of(
-                request.getPage(),
-                request.getSize(),
+            pageIndex,
+            request.getLimit(),
                 Sort.by(Sort.Direction.ASC, "eventDate")
         );
 
-        Page<EventResponse> page = eventRepository
-                .findAll(spec, pageable)
-                .map(EventResponse::fromEntity);
+        Page<EventListItemResponse> page = eventRepository
+            .findAll(spec, pageable)
+            .map(EventListItemResponse::fromEntity);
 
         return PagedResponse.fromPage(page);
     }
@@ -103,29 +108,14 @@ public class EventService {
     /**
      * Detalle completo de un evento por id.
      * Incluye tipos de boleta activos con cupos restantes.
-        * Solo retorna eventos en estado PUBLISHED y con fecha futura.
+     * Solo retorna eventos en estado PUBLISHED.
      */
     @Transactional(readOnly = true)
     public EventResponse getPublishedEventById(Long id) {
-        LocalDateTime now = LocalDateTime.now();
         Event event = eventRepository.findById(id)
-            .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
-            .filter(e -> e.getEventDate().isAfter(now))
-            .orElseThrow(() -> new EventNotFoundException(id));
+                .filter(e -> e.getStatus() == EventStatus.PUBLISHED)
+                .orElseThrow(() -> new EventNotFoundException(id));
         return EventResponse.fromEntity(event);
-    }
-
-    /**
-     * Listado simple sin filtros — mantiene compatibilidad con
-     * el endpoint original de US-01.
-     */
-    @Transactional(readOnly = true)
-    public List<EventResponse> getPublishedEvents() {
-        return eventRepository
-                .findUpcomingPublishedEvents(LocalDateTime.now())
-                .stream()
-                .map(EventResponse::fromEntity)
-                .collect(Collectors.toList());
     }
 
     // ── Gestión del organizador ──────────────────────────────────────
@@ -265,6 +255,21 @@ public class EventService {
             throw new IllegalStateException(
                     "La suma de cantidades de boletas no puede superar el cupo maximo"
             );
+        }
+    }
+
+    private void validateSearchRequest(EventSearchRequest request) {
+        if (request.getPage() < 1) {
+            throw new UnprocessableEntityException("page must be >= 1");
+        }
+
+        if (request.getLimit() < 1 || request.getLimit() > 50) {
+            throw new UnprocessableEntityException("limit must be between 1 and 50");
+        }
+
+        if (request.getDateFrom() != null && request.getDateTo() != null
+                && request.getDateFrom().isAfter(request.getDateTo())) {
+            throw new UnprocessableEntityException("dateFrom must be before dateTo");
         }
     }
 }
