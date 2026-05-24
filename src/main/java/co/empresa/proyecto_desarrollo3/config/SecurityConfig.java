@@ -81,15 +81,7 @@ public class SecurityConfig {
      * elimina este @Bean y usa en application.properties:
      *   spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${KEYCLOAK_JWK_SET_URI}
      */
-    @Bean
-    public JwtDecoder gatewayAwareJwtDecoder() {
-        return token -> Jwt.withTokenValue(token)
-                .header("alg", "none")
-                .claim("sub", "forwarded-by-gateway")
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .build();
-    }
+
 
     /**
      * Converter que extrae roles desde el token ya enriquecido por el Gateway.
