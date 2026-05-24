@@ -25,6 +25,9 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Dar permisos de ejecución al wrapper de Maven
+        run: chmod +x ./mvnw
+
       - name: Compilar (sin ejecutar tests)
         run: ./mvnw compile -B
 
@@ -49,6 +52,9 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Dar permisos de ejecución al wrapper de Maven
+        run: chmod +x ./mvnw
 
       # Los tests usan H2 en memoria (application.properties de test),
       # así que no se necesita levantar PostgreSQL.
