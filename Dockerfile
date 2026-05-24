@@ -17,7 +17,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar /app/app.jar
 
 # Puerto del event-service
-EXPOSE 8082
+EXPOSE 8081
 
 ENV JAVA_OPTS="-Xms128m -Xmx256m"
 
