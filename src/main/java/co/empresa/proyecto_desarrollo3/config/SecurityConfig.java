@@ -34,10 +34,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // ── Endpoints del organizador ────────────────────────
-                        .requestMatchers(HttpMethod.GET,   "/api/v1/events/my-events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.POST,  "/api/v1/events").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("EVENT_CREATOR")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("EVENT_CREATOR")
+                        .requestMatchers(HttpMethod.GET,   "/api/v1/events/my-events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.POST,  "/api/v1/events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("ORGANIZER")
 
                         // ── Endpoints internos (order-service) ───────────────
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/reserve").hasRole("ORDER_SERVICE")
