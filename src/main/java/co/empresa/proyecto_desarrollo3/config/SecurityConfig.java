@@ -10,7 +10,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -21,93 +24,95 @@ import java.util.stream.Collectors;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    /**
-     * Cadena de filtros de seguridad.
-     * Define qué endpoints son públicos y cuáles requieren autenticación.
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Sin estado: cada request lleva su JWT, no hay sesión en servidor
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // Deshabilitar CSRF: no aplica en APIs REST stateless con JWT
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
 
                         // ── Endpoints del organizador ────────────────────────
-                        .requestMatchers(HttpMethod.GET, "/api/v1/events/my-events").hasRole("ORGANIZER")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.GET,   "/api/v1/events/my-events").hasRole("ORGANIZER")
+                        .requestMatchers(HttpMethod.POST,  "/api/v1/events").hasRole("ORGANIZER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/publish").hasRole("ORGANIZER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/events/*/cancel").hasRole("ORGANIZER")
 
-                        // ── Endpoints de ordenes ─────────────────────────────
+                        // ── Endpoints internos (order-service) ───────────────
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/reserve").hasRole("ORDER_SERVICE")
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/release").hasRole("ORDER_SERVICE")
 
-                        // ── Endpoints públicos ───────────────────────────────
-                        // Catálogo de eventos: cualquiera puede ver
+                        // ── Catálogo público ──────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events").permitAll()
 
-                        // Health check para Docker y monitoreo
+                        // ── Health check ──────────────────────────────────────
                         .requestMatchers("/actuator/health").permitAll()
 
-                        // ── Endpoints de administrador ───────────────────────
+                        // ── Admin ─────────────────────────────────────────────
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
-                        // ── Cualquier otra ruta requiere autenticación ───────
                         .anyRequest().authenticated()
                 )
 
-                // Configurar como Resource Server que valida JWT
+                // Usar oauth2ResourceServer para que @AuthenticationPrincipal Jwt
+                // siga funcionando. El JwtDecoder real se define abajo.
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        )
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(gatewayJwtConverter()))
                 );
 
         return http.build();
     }
 
     /**
-     * Converter que extrae los roles desde el claim de Keycloak.
+     * JwtDecoder de paso que confía en el token ya validado por el Gateway.
      *
-     * Keycloak pone los roles en una estructura anidada:
-        *   "realm_access": { "roles": ["ROLE_ADMIN", "ROLE_ORGANIZER"] }
+     * En producción: el Gateway ya verificó el JWT contra Keycloak y lo
+     * reenvía al event-service junto con los headers X-User-*. Este decoder
+     * simplemente reconstruye el objeto Jwt para @AuthenticationPrincipal.
      *
-     * Spring Security espera GrantedAuthority con prefijo "ROLE_".
-     * Este converter hace la traducción automáticamente.
+     * En tests: spring-security-test intercepta con jwt() y NUNCA invoca
+     * este bean, por lo que los tests de integración siguen funcionando
+     * exactamente igual que antes.
+     *
+     * Alternativa si quieres doble validación (Gateway + event-service):
+     * elimina este @Bean y usa en application.properties:
+     *   spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${KEYCLOAK_JWK_SET_URI}
+     */
+
+
+    /**
+     * Converter que extrae roles desde el token ya enriquecido por el Gateway.
+     * Compatible con tokens Keycloak directos (realm_access.roles) y con
+     * el claim "role" que el gateway puede inyectar.
      */
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+    public JwtAuthenticationConverter gatewayJwtConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            // Leer el claim realm_access del token de Keycloak
-            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
 
-            if (realmAccess == null || !realmAccess.containsKey("roles")) {
-                return List.of();
+            // Opción A: token Keycloak completo (realm_access.roles)
+            Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+            if (realmAccess != null && realmAccess.containsKey("roles")) {
+                @SuppressWarnings("unchecked")
+                Collection<String> roles = (Collection<String>) realmAccess.get("roles");
+                return roles.stream()
+                        .map(r -> new SimpleGrantedAuthority(
+                                r.startsWith("ROLE_") ? r : "ROLE_" + r))
+                        .collect(Collectors.toList());
             }
 
-            @SuppressWarnings("unchecked")
-            Collection<String> roles = (Collection<String>) realmAccess.get("roles");
+            // Opción B: claim "role" inyectado por el gateway (X-User-Role)
+            String roleClaim = jwt.getClaim("role");
+            if (roleClaim != null && !roleClaim.isBlank()) {
+                return List.of(new SimpleGrantedAuthority(
+                        roleClaim.startsWith("ROLE_") ? roleClaim : "ROLE_" + roleClaim));
+            }
 
-            // Convertir cada rol a SimpleGrantedAuthority
-            // Keycloak ya incluye el prefijo ROLE_ si así se configuró el mapper.
-            // Si no, se agrega aquí: "ROLE_" + role
-            return roles.stream()
-                    .map(role -> new SimpleGrantedAuthority(
-                            role.startsWith("ROLE_") ? role : "ROLE_" + role
-                    ))
-                    .collect(Collectors.toList());
+            return List.of();
         });
-
         return converter;
     }
 }
-

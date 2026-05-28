@@ -1,0 +1,136 @@
+name: CI – d3-event-service
+
+on:
+  push:
+    branches: [ "main", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. COMPILACIÓN
+  # ──────────────────────────────────────────────
+  build:
+    name: Compilar proyecto
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Dar permisos de ejecución al wrapper de Maven
+        run: chmod +x ./mvnw
+
+      - name: Compilar (sin ejecutar tests)
+        run: ./mvnw compile -B
+
+      - name: Compilar clases de test
+        run: ./mvnw test-compile -B
+
+  # ──────────────────────────────────────────────
+  # 2. TESTS DE INTEGRACIÓN
+  # ──────────────────────────────────────────────
+  test:
+    name: Ejecutar tests
+    runs-on: ubuntu-latest
+    needs: build          # solo corre si la compilación fue exitosa
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Dar permisos de ejecución al wrapper de Maven
+        run: chmod +x ./mvnw
+
+      # Los tests usan H2 en memoria (application.properties de test),
+      # así que no se necesita levantar PostgreSQL.
+      - name: Ejecutar todos los tests
+        run: ./mvnw test -B
+
+      # ── Tests específicos por funcionalidad ──
+
+      - name: "Test: flujo completo crear → publicar → reservar → liberar"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#createDraftPublishReserveReleaseFlow" \
+            -DfailIfNoTests=false
+
+      - name: "Test: reserva por encima de la capacidad devuelve 409"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#reserveOverCapacityReturnsConflict" \
+            -DfailIfNoTests=false
+
+      - name: "Test: listado muestra precio mínimo y disponibilidad"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#listingDefaultsIncludeMinPriceAndSoldOut" \
+            -DfailIfNoTests=false
+
+      - name: "Test: listado marca evento como sold out"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#listingShowsSoldOutWhenAllTypesEmpty" \
+            -DfailIfNoTests=false
+
+      - name: "Test: listado incluye eventos pasados publicados"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#listingReturnsPastPublishedWhenNoDateFilters" \
+            -DfailIfNoTests=false
+
+      - name: "Test: alias /search devuelve resultados paginados"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#searchAliasReturnsPagedResults" \
+            -DfailIfNoTests=false
+
+      - name: "Test: paginación inválida devuelve 422"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#invalidPaginationReturnsUnprocessableEntity" \
+            -DfailIfNoTests=false
+
+      - name: "Test: rango de fechas inválido devuelve 422"
+        if: always()
+        run: |
+          ./mvnw test -B \
+            -Dtest="EventFlowIntegrationTest#invalidDateRangeReturnsUnprocessableEntity" \
+            -DfailIfNoTests=false
+
+      - name: Publicar reporte de tests (Surefire)
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: '**/target/surefire-reports/TEST-*.xml'
+          fail_on_failure: true
+          require_tests: true
+
+      - name: Subir artefactos de reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
