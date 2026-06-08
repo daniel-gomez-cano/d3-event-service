@@ -43,6 +43,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/reserve").hasRole("ORDER_SERVICE")
                         .requestMatchers(HttpMethod.POST, "/api/v1/events/*/release").hasRole("ORDER_SERVICE")
 
+                        // ── Endpoints internos (comunicación entre microservicios) ────────
+                        .requestMatchers(HttpMethod.GET, "/api/internal/**").permitAll()
+
                         // ── Catálogo público ──────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/events/*").permitAll()
