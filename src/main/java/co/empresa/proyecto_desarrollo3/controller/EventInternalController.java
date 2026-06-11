@@ -1,7 +1,12 @@
 package co.empresa.proyecto_desarrollo3.controller;
 
+import co.empresa.proyecto_desarrollo3.dto.request.ReleaseTicketRequest;
+import co.empresa.proyecto_desarrollo3.dto.request.ReserveTicketRequest;
 import co.empresa.proyecto_desarrollo3.dto.response.TicketTypeInfoResponse;
 import co.empresa.proyecto_desarrollo3.repository.TicketTypeRepository;
+import co.empresa.proyecto_desarrollo3.service.EventService;
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,9 +22,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class EventInternalController {
 
     private final TicketTypeRepository ticketTypeRepository;
+    private final EventService eventService;
 
-    public EventInternalController(TicketTypeRepository ticketTypeRepository) {
+    public EventInternalController(TicketTypeRepository ticketTypeRepository, EventService eventService) {
         this.ticketTypeRepository = ticketTypeRepository;
+        this.eventService = eventService;
     }
 
     /**
@@ -33,5 +40,23 @@ public class EventInternalController {
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Tipo de boleta no encontrado: " + id));
+    }
+
+    /** Llamado por order-service tras pago APPROVED */
+    @PostMapping("/events/{id}/reserve")
+    public ResponseEntity<Void> reserveTickets(
+            @PathVariable Long id,
+            @Valid @RequestBody ReserveTicketRequest request) {
+        eventService.reserveTickets(id, request);
+        return ResponseEntity.ok().build();
+    }
+
+    /** Llamado por order-service cuando se procesa un reembolso */
+    @PostMapping("/events/{id}/release")
+    public ResponseEntity<Void> releaseTickets(
+            @PathVariable Long id,
+            @Valid @RequestBody ReleaseTicketRequest request) {
+        eventService.releaseTickets(id, request);
+        return ResponseEntity.ok().build();
     }
 }
